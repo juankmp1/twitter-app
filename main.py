@@ -45,6 +45,13 @@ class Tweet(BaseModel):
     update_at_time : Optional[datetime] = Field(default=None)
     by: User = Field(...)
 
+class UserRegister(User):
+    password : str =Field(
+        ...,
+        min_length = 8,
+        max_length=64
+    )
+
 # Path Operations
 
 
@@ -89,6 +96,22 @@ def login():
     tags=["Users"]
 )
 def signup():
+    """
+    SingUp
+
+    This path operation register a user in the app
+    
+    Parameters:
+        - Request body parameter
+            - user: UserRegister
+
+    Returns a json with the basic user information:
+        - user_id: UUID
+        - email: EmailStr
+        - firts_name: str
+        - last_name: str
+        - birth_date: str
+    """
     pass
 
 ### Show all users
