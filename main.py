@@ -1,10 +1,16 @@
+#Python
 from uuid import UUID
 from datetime import date, datetime
-
-from fastapi import FastAPI, status
-from pydantic import BaseModel, EmailStr, Field
+import json
 from typing import Optional,List
 
+#Pydantic
+
+from pydantic import BaseModel, EmailStr, Field
+
+#FastAPI
+from fastapi import FastAPI, status, Body
+from fastapi.encoders import jsonable_encoder
  
 app = FastAPI()
 
@@ -28,6 +34,11 @@ class User(UserBase):
         min_length = 8
     )
     first_name: str = Field(
+        ...,
+        min_length = 1,
+        max_length = 50
+    )
+    last_name: str = Field(
         ...,
         min_length = 1,
         max_length = 50
@@ -57,25 +68,6 @@ class UserRegister(User):
 
 ## Users
 
-@app.post(
-    path="/signup",
-    response_model= User,
-    status_code= status.HTTP_201_CREATED,
-    summary="Register a user",
-    tags=["Users"]
-)
-def signup():
-    pass
-@app.post(
-    path="/signup",
-    response_model= User,
-    status_code= status.HTTP_201_CREATED,
-    summary="Register a user",
-    tags=["Users"]
-)
-def signup():
-    pass
-
 ## Login a user
 @app.post(
     path="/login",
@@ -95,7 +87,7 @@ def login():
     summary="Login a user",
     tags=["Users"]
 )
-def signup():
+def signup(user: UserRegister = Body(...)):
     """
     SingUp
 
@@ -110,9 +102,17 @@ def signup():
         - email: EmailStr
         - firts_name: str
         - last_name: str
-        - birth_date: str
+        - birth_date: date
     """
-    pass
+    with open("./users.json","r+", encoding="utf-8") as f:
+        results = json.load(f)
+        user_dict = user.dict()
+        user_dict["user_id"] = str(user_dict["user_id"])
+        user_dict["birth_date"] = str(user_dict["birth_date"])
+        results.append(user_dict)
+        f.seek(0) #para que no se genere mas listas en el archivo de users.js
+        f.write(json.dumps(results))
+        return user
 
 ### Show all users
 @app.get(
