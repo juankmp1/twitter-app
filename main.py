@@ -1,9 +1,12 @@
 #Python
 from uuid import UUID
 from datetime import date, datetime
-import json
+import json 
+from json import JSONEncoder, dumps
 from typing import Optional,List
 from jwt_manager import create_token, validate_token
+from models.movie import Movie as MovieModel 
+from config.database import Session, engine, Base
 #Pydantic
 
 from pydantic import BaseModel, EmailStr, Field
@@ -13,6 +16,8 @@ from fastapi import FastAPI, status, Body, Depends, HTTPException, Path, Query, 
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.encoders import jsonable_encoder
 from fastapi.security import HTTPBearer
+
+
  
 app = FastAPI()
 app.title = "Mi aplicación con fastAPI"
@@ -20,9 +25,11 @@ app.version = "0.0.1"
 
 #Models
 
+Base.metadata.create_all(bind = engine)
+
 class JWTBearer(HTTPBearer):
     async def __call__(self, request: Request):
-        auth = await super():__call__(request)
+        auth = await super().__call__(request)
         data = validate_token(auth.credentials)
         if data['email'] != "admin@gmail.com":
             raise HTTPException(status_code=403, detail = "Credenciales son invalidas")
@@ -34,6 +41,7 @@ class UserBase(BaseModel):
 class Movie(BaseModel):
     id : Optional[int] = None
     title : str = Field(min_length=15, max_length=50)
+    overview: str = Field(min_length=15, max_length=50)
     year: int = Field(le=2022)
     rating : float= Field(ge=1, le=10)
     category : str = Field(min_length=5, max_length=15)
@@ -81,19 +89,19 @@ class User(UserBase):
     email: EmailStr = Field(...)
     password : str =Field(
         ...,
-        min_length = 8
+        min_length = 5
     )
-    first_name: str = Field(
-        ...,
-        min_length = 1,
-        max_length = 50
-    )
-    last_name: str = Field(
-        ...,
-        min_length = 1,
-        max_length = 50
-    )
-    birth_date: Optional[date] = Field(default= None)
+    # first_name: str = Field(
+    #     ...,
+    #     min_length = 1,
+    #     max_length = 50
+    # )
+    # last_name: str = Field(
+    #     ...,
+    #     min_length = 1,
+    #     max_length = 50
+    # )
+    #birth_date: Optional[date] = Field(default= None)
 
 class Tweet(BaseModel):
     tweet_id: UUID = Field(...)
@@ -133,7 +141,7 @@ def message():
 def login(user:User):
     if user.email == "admin@gmail.com" and user.password =="admin":
         token : str = create_token(user.dict())
-        return JSONResponse(status_code=200, content=token)
+        return JSONResponse(status_code=200, content=JSONEncoder.default(token))
 
 ## Register a user
 @app.post(
@@ -223,17 +231,21 @@ def update_a_user():
     status_code = 200,
     dependencies=[Depends(JWTBearer())])
 def get_movies() -> List[Movie]:
-    return JSONResponse(status_code=200, content=movies)
+    db = Session()
+    result = db.query(MovieModel).all()
+    return JSONResponse(status_code=200, content=jsonable_encoder(result))
 
 @app.get(
     path='/movies/{id}',
     tags = 'movies',
     response_model=Movie)
 def get_movie(id:int = Path(ge=1, le=2000))->Movie:
-    for item in movies:
-        if item["id"] == id:
-            return JSONResponse(content= item)
-    return JSONResponse(status_code=404, content=[])
+    db = Session()
+    result = db.query(MovieModel).filter(MovieModel.id == id).first()
+    if not result:
+        return JSONResponse(status_code=404, content = {'message': 'No encontrado'})
+    return JSONResponse(status_code = 200, content= jsonable_encoder(result))
+        
 
 @app.get(
     path='/movies/', 
@@ -244,12 +256,15 @@ def get_movies_by_category(category: str = Query(min_length=5, max_length=15)) -
     return JSONResponse(content = data)
 
 @app.post(
-    path='movies',
+    path='/movies',
     tags= ['movies'],
     response_model= dict,
     status_code=201)
 def create_movie(movie:Movie)-> dict:
-    movies.append(movie)
+    db = Session()
+    new_movie = MovieModel(**movie.dict())
+    db.add(new_movie)
+    db.commit()
     return JSONResponse(status_code=201, content={"message":"The movie has registered"})
 
 @app.put(
